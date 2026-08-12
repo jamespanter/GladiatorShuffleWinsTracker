@@ -1,4 +1,10 @@
 AchievementIDs = {
+    ExpansionStartSeasons = {
+        [30] = { expansion = "Shadowlands" },
+        [34] = { expansion = "Dragonflight" },
+        [38] = { expansion = "The War Within" },
+        [41] = { expansion = "Midnight" },
+    },
     Gladiator = {
         [30] = 14689, -- Gladiator: Shadowlands Season 1
         [31] = 14972, -- Gladiator: Shadowlands Season 2
@@ -15,6 +21,8 @@ AchievementIDs = {
         [42] = 62930, -- Gladiator: Midnight Season 2
     },
     ShuffleLegend = {
+        [34] = 17339, -- Legend: Dragonflight Season 1
+        [35] = 17801, -- Legend: Dragonflight Season 2
         [36] = 19304, -- Legend: Dragonflight Season 3
         [37] = 19500, -- Legend: Dragonflight Season 4
         [38] = 40395, -- Legend: The War Within Season 1

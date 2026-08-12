@@ -139,14 +139,34 @@ local function setGWTVersion()
 	GWTVersion = version
 end
 
+local function getAchievementID(achievementType, season)
+	local achievementTable = AchievementIDs[achievementType]
+	local achievementEntry = achievementTable and achievementTable[season]
+
+	if type(achievementEntry) == "table" then
+		return achievementEntry.id or 0
+	end
+
+	return achievementEntry or 0
+end
+
 local function setCurrentPVPSeasonAchievementIds()
 	local currentPVPSeason = GetCurrentArenaSeason()
 
 	seasonActive = currentPVPSeason ~= 0
 
-	currentGladAchievementId = AchievementIDs.Gladiator[currentPVPSeason] or 0
-	currentLegendAchievementId = AchievementIDs.ShuffleLegend[currentPVPSeason] or 0
-	currentBlitzAchievementId = AchievementIDs.BlitzStrategist[currentPVPSeason] or 0
+	currentGladAchievementId = getAchievementID("Gladiator", currentPVPSeason)
+	currentLegendAchievementId = getAchievementID("ShuffleLegend", currentPVPSeason)
+	currentBlitzAchievementId = getAchievementID("BlitzStrategist", currentPVPSeason)
+end
+
+local function toggleAchievementTracking(achievementId)
+	local id, _, _, completed, _, _, _, _, _, _, _, _, wasEarnedByMe = GetAchievementInfo(achievementId)
+	if completed and wasEarnedByMe then
+		showAlreadyCompletedAlert()
+	else
+		C_ContentTracking.ToggleTracking(2, achievementId, 2)
+	end
 end
 
 local function createButton(name, parentFrame, achievementId)
@@ -161,12 +181,7 @@ local function createButton(name, parentFrame, achievementId)
 		elseif achievementId == 0 then
 			showIDMissingForSeasonAlert()
 		else
-			local id, _, _, completed, _, _, _, _, _, _, _, _, wasEarnedByMe = GetAchievementInfo(achievementId)
-			if completed and wasEarnedByMe then
-				showAlreadyCompletedAlert()
-			else
-				C_ContentTracking.ToggleTracking(2, achievementId, 2)
-			end
+			toggleAchievementTracking(achievementId)
 		end
 	end)
 
@@ -175,6 +190,243 @@ end
 
 local function canCreateButtons()
 	return ConquestFrame and ConquestFrame.Arena3v3 and ConquestFrame.RatedSoloShuffle and ConquestFrame.RatedBGBlitz
+end
+
+local ACHIEVEMENT_TABLE_COLUMNS = {
+	{ key = "season", label = "", width = 0.34 },
+	{ key = "Gladiator", label = "Gladiator", width = 0.2 },
+	{ key = "ShuffleLegend", label = "Shuffle Legend", width = 0.23 },
+	{ key = "BlitzStrategist", label = "Blitz Strategist", width = 0.23 },
+}
+
+local OPTIONS_TEXT_COLOR = NORMAL_FONT_COLOR_CODE or "|cffffd200"
+
+local function getSortedAchievementSeasons()
+	local seasons, seenSeasons = {}, {}
+
+	for _, achievementType in ipairs({ "Gladiator", "ShuffleLegend", "BlitzStrategist" }) do
+		local achievementsBySeason = AchievementIDs[achievementType]
+
+		if achievementsBySeason then
+			for season in pairs(achievementsBySeason) do
+				if type(season) == "number" and not seenSeasons[season] then
+					table.insert(seasons, season)
+					seenSeasons[season] = true
+				end
+			end
+		end
+	end
+
+	table.sort(seasons, function(a, b)
+		return a > b
+	end)
+
+	return seasons
+end
+
+local function getAchievementExpansionInfo(season)
+	local expansionName
+	local expansionStartSeason
+
+	if not AchievementIDs.ExpansionStartSeasons then
+		return "Unknown Expansion", season
+	end
+
+	for startSeason, seasonInfo in pairs(AchievementIDs.ExpansionStartSeasons) do
+		if startSeason <= season and (not expansionStartSeason or startSeason > expansionStartSeason) then
+			expansionStartSeason = startSeason
+			expansionName = seasonInfo.expansion
+		end
+	end
+
+	return expansionName or "Unknown Expansion", expansionStartSeason or season
+end
+
+local function formatAchievementSeason(season)
+	local expansionName, expansionStartSeason = getAchievementExpansionInfo(season)
+	local expansionSeason = season - expansionStartSeason + 1
+
+	return OPTIONS_TEXT_COLOR .. expansionName .. "|r |cffffffffS" .. expansionSeason .. "|r"
+end
+
+local function formatAchievementID(achievementId)
+	if not achievementId or achievementId == 0 then
+		return "|cff777777-|r"
+	end
+
+	return "|cffffffff" .. achievementId .. "|r"
+end
+
+local function createAchievementTableCell(parent, text, width, height, template, justifyH, achievementId)
+	local cell = CreateFrame("Frame", nil, parent)
+	cell:SetSize(width, height)
+
+	local label = cell:CreateFontString(nil, "ARTWORK", template or "GameFontHighlightSmall")
+	label:SetJustifyH(justifyH or "CENTER")
+	label:SetJustifyV("MIDDLE")
+	label:SetText(text)
+
+	if achievementId and achievementId ~= 0 then
+		local button = CreateFrame("Button", nil, cell, "UIPanelButtonTemplate")
+		button:SetSize(20, 20)
+		button:SetText(">")
+		button:SetPoint("RIGHT", cell, "RIGHT", -4, 0)
+		button:SetScript("OnClick", function()
+			toggleAchievementTracking(achievementId)
+		end)
+
+		label:SetPoint("LEFT", cell, "LEFT", 4, 0)
+		label:SetPoint("RIGHT", button, "LEFT", -4, 0)
+	else
+		label:SetPoint("LEFT", cell, "LEFT", 4, 0)
+		label:SetPoint("RIGHT", cell, "RIGHT", -4, 0)
+	end
+
+	label:SetPoint("TOP", cell, "TOP", 0, 0)
+	label:SetPoint("BOTTOM", cell, "BOTTOM", 0, 0)
+
+	return cell
+end
+
+local function createAchievementIDsTable(parent, anchor)
+	local currentSeason = GetCurrentArenaSeason and GetCurrentArenaSeason() or 0
+	local rowHeight = 26
+	local contentBottomPadding = 10
+
+	local sectionTitle = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	sectionTitle:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", -22, -28)
+	sectionTitle:SetText("|cffffff00Achievement IDs|r")
+
+	local section = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	section:SetPoint("TOPLEFT", sectionTitle, "BOTTOMLEFT", 2, -10)
+	section:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8x8",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true,
+		tileSize = 16,
+		edgeSize = 12,
+		insets = { left = 4, right = 4, top = 4, bottom = 4 },
+	})
+	section:SetBackdropColor(0.035, 0.035, 0.045, 0.92)
+	section:SetBackdropBorderColor(0.45, 0.36, 0.14, 0.95)
+
+	local function resizeSectionBounds()
+		local parentRight = parent:GetRight()
+		local parentBottom = parent:GetBottom()
+		local sectionLeft = section:GetLeft()
+		local sectionTop = section:GetTop()
+
+		if parentRight and sectionLeft then
+			section:SetWidth(math.max(380, parentRight - sectionLeft - 24))
+		else
+			section:SetWidth(650)
+		end
+
+		if parentBottom and sectionTop then
+			section:SetHeight(math.max(140, sectionTop - parentBottom - 42))
+		else
+			section:SetHeight(270)
+		end
+	end
+
+	local header = CreateFrame("Frame", nil, section)
+	header:SetHeight(rowHeight)
+	header:SetPoint("TOPLEFT", section, "TOPLEFT", 16, -14)
+
+	local resizeTargets = {}
+	local previousCell
+	for _, column in ipairs(ACHIEVEMENT_TABLE_COLUMNS) do
+		local cell = createAchievementTableCell(header, "|cff33ff99" .. column.label .. "|r", 1, rowHeight, "GameFontNormalSmall", column.key == "season" and "LEFT" or nil)
+		if previousCell then
+			cell:SetPoint("LEFT", previousCell, "RIGHT", 0, 0)
+		else
+			cell:SetPoint("LEFT", header, "LEFT", 0, 0)
+		end
+		table.insert(resizeTargets, { cell = cell, column = column })
+		previousCell = cell
+	end
+
+	local scrollFrame = CreateFrame("ScrollFrame", nil, section, "UIPanelScrollFrameTemplate")
+	scrollFrame:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
+	scrollFrame:SetPoint("BOTTOMRIGHT", section, "BOTTOMRIGHT", -42, 8)
+
+	local content = CreateFrame("Frame", nil, scrollFrame)
+	content:SetSize(1, 1)
+	scrollFrame:SetScrollChild(content)
+
+	local seasons = getSortedAchievementSeasons()
+	local rows = {}
+	local previousRow
+
+	for index, season in ipairs(seasons) do
+		local row = CreateFrame("Frame", nil, content)
+		row:SetHeight(rowHeight)
+		if previousRow then
+			row:SetPoint("TOPLEFT", previousRow, "BOTTOMLEFT", 0, 0)
+		else
+			row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
+		end
+
+		local rowBg = row:CreateTexture(nil, "BACKGROUND")
+		rowBg:SetAllPoints()
+		if season == currentSeason then
+			rowBg:SetColorTexture(0.09, 0.27, 0.14, 0.85)
+		elseif index % 2 == 0 then
+			rowBg:SetColorTexture(0.075, 0.077, 0.087, 0.86)
+		else
+			rowBg:SetColorTexture(0.035, 0.037, 0.045, 0.88)
+		end
+
+		local rowAchievementIds = {
+			Gladiator = getAchievementID("Gladiator", season),
+			ShuffleLegend = getAchievementID("ShuffleLegend", season),
+			BlitzStrategist = getAchievementID("BlitzStrategist", season),
+		}
+
+		local rowValues = {
+			season = formatAchievementSeason(season),
+			Gladiator = formatAchievementID(rowAchievementIds.Gladiator),
+			ShuffleLegend = formatAchievementID(rowAchievementIds.ShuffleLegend),
+			BlitzStrategist = formatAchievementID(rowAchievementIds.BlitzStrategist),
+		}
+
+		previousCell = nil
+		for _, column in ipairs(ACHIEVEMENT_TABLE_COLUMNS) do
+			local cell = createAchievementTableCell(row, rowValues[column.key], 1, rowHeight, "GameFontHighlightSmall", column.key == "season" and "LEFT" or nil, rowAchievementIds[column.key])
+			if previousCell then
+				cell:SetPoint("LEFT", previousCell, "RIGHT", 0, 0)
+			else
+				cell:SetPoint("LEFT", row, "LEFT", 0, 0)
+			end
+			table.insert(resizeTargets, { cell = cell, column = column })
+			previousCell = cell
+		end
+
+		table.insert(rows, row)
+		previousRow = row
+	end
+
+	content:SetHeight(math.max(1, #seasons * rowHeight + contentBottomPadding))
+
+	local function resizeAchievementTable()
+		local tableWidth = math.max(360, section:GetWidth() - 58)
+		header:SetWidth(tableWidth)
+		content:SetWidth(tableWidth)
+
+		for _, row in ipairs(rows) do
+			row:SetWidth(tableWidth)
+		end
+
+		for _, target in ipairs(resizeTargets) do
+			target.cell:SetWidth(math.floor(tableWidth * target.column.width))
+		end
+	end
+
+	section:HookScript("OnSizeChanged", resizeAchievementTable)
+	section:HookScript("OnShow", resizeSectionBounds)
+	parent:HookScript("OnSizeChanged", resizeSectionBounds)
+	resizeSectionBounds()
+	resizeAchievementTable()
 end
 
 local function createButtons()
@@ -209,7 +461,7 @@ local function createOptionsPanel()
 	title:SetText("Gladiator, Shuffle & Blitz Wins Tracker")
 
 	local charTitle = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	charTitle:SetText("|cffffff00Character Specific Settings|r")
+	charTitle:SetText("|cffffff00Character Settings|r")
 	charTitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", -2, -16)
 
 	local hideGladCheckbox = newCheckbox("Hide |cff33ff993v3|r button on this character", function(_, value)
@@ -270,6 +522,8 @@ local function createOptionsPanel()
 	end)
 	hideIntroCheckbox:SetChecked(not GWT_LoginIntro)
 	hideIntroCheckbox:SetPoint("TOPLEFT", accountSettingsTitle, "TOPLEFT", 20, -25)
+
+	createAchievementIDsTable(frame, hideIntroCheckbox)
 
 	local versionText = frame:CreateFontString(nil, "ARTWORK", "GameFontDisable")
 	versionText:SetText("|cffffff00Version:|r |cffffffff" .. (GWTVersion or "Unknown") .. "|r")
