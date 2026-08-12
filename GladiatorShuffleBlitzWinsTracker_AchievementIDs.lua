@@ -12,6 +12,7 @@ AchievementIDs = {
         [39] = 41032, -- Gladiator: The War Within Season 2
         [40] = 41049, -- Gladiator: The War Within Season 3
         [41] = 61188, -- Gladiator: Midnight Season 1
+        [42] = 62930, -- Gladiator: Midnight Season 2
     },
     ShuffleLegend = {
         [36] = 19304, -- Legend: Dragonflight Season 3
@@ -20,11 +21,13 @@ AchievementIDs = {
         [39] = 41358, -- Legend: The War Within Season 2
         [40] = 42023, -- Legend: The War Within Season 3
         [41] = 61190, -- Legend: Midnight Season 1
+        [42] = 62932, -- Legend: Midnight Season 2
     },
     BlitzStrategist = {
         [38] = 40233, -- Strategist: The War Within Season 1
         [39] = 41363, -- Strategist: The War Within Season 2
         [40] = 42024, -- Strategist: The War Within Season 3
         [41] = 61194, -- Strategist: Midnight Season 1
+        [42] = 62950, -- Strategist: Midnight Season 2
     },
 }
