@@ -2,7 +2,7 @@
 
 - Adds 3 buttons to the rated PVP tab.
 - Track **Gladiator**, **Shuffle Legend**, **Blitz Strategist** achievements for the current PVP season.
-- View historic achievement progress.
+- View historic achievement progress in options.
 
 ![Screenshot of buttons](https://raw.githubusercontent.com/jamespanter/GladiatorShuffleBlitzWinsTracker/master/.github/assets/buttons.png)
 ![Screenshot of achievements](https://raw.githubusercontent.com/jamespanter/GladiatorShuffleBlitzWinsTracker/master/.github/assets/achievements.png)
